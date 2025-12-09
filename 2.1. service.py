@@ -4,30 +4,30 @@ from models import Driver, Passenger, RideRequest, Ride, Vehicle
 from utils import calculate_distance, save_data, load_data, NoDriverFoundError, InvalidRequestError, Location
 from datetime import timedelta
 
-# Sabitler
-BASE_RATE = 0.50  # km başına ücret
-TIME_RATE = 0.20  # dakika başına ücret
-BASE_FARE = 2.50  # Başlangıç ücreti
+# Constants
+BASE_RATE = 0.50  # Fare per km
+TIME_RATE = 0.20  # Fare per minute
+BASE_FARE = 2.50  # Starting fare
 
 class RideService:
-    """Tüm sürücü, yolcu ve sürüş verilerini yöneten ve işlemleri koordine eden ana sınıf."""
+    """The main class that manages all driver, passenger, and ride data, coordinating operations."""
     def __init__(self):
         self._drivers = []
         self._passengers = []
         self._requests = []
         self._rides = []
-        self._load_initial_data() # Kalıcılık simülasyonu
+        self._load_initial_data() # Persistence simulation
 
-    # --- Veri Yönetimi ---
+    # --- Data Management ---
     def _load_initial_data(self):
-        """Uygulama başladığında simüle edilmiş verileri yükler."""
+        """Loads simulated data when the application starts."""
         data = load_data()
         
-        # Gerçek uygulamada nesneleri yeniden oluşturmak daha karmaşık olacaktır.
-        # Bu örnekte, basitçe listeleri temizleyip yeniden ekleyelim:
-        print("Veriler Yüklendi.")
+        # Recreating objects in a real application would be more complex.
+        # For this example, we simply clear and re-add the lists:
+        print("Data Loaded.")
         
-    # --- CRUD İşlemleri ---
+    # --- CRUD Operations ---
     def add_driver(self, driver: Driver):
         self._drivers.append(driver)
 
@@ -40,21 +40,21 @@ class RideService:
                 return driver
         return None
 
-    # --- Algoritmik Gereklilikler ---
+    # --- Algorithmic Requirements ---
 
-    # Fare Estimation (Ücret Tahmini) [cite: 492]
+    # [cite_start]Fare Estimation (Requirement: Fare Estimation) [cite: 492]
     def _estimate_fare(self, distance_km: float) -> float:
-        """Basit bir formül kullanarak sürüş ücretini hesaplar."""
-        # Tahmini süre (varsayım: 30 km/saat ortalama hız)
+        """Calculates the ride fare using a simple formula."""
+        # Estimated time (assumption: 30 km/h average speed)
         estimated_time_min = (distance_km / 30) * 60
         
         fare = BASE_FARE + (distance_km * BASE_RATE) + (estimated_time_min * TIME_RATE)
         return round(fare, 2)
 
-    # Nearest Available Driver Search (En Yakın Sürücü Arama) [cite: 489]
+    # [cite_start]Nearest Available Driver Search (Requirement: Search for nearest available driver) [cite: 489]
     def _find_nearest_driver(self, pickup_loc: Location) -> tuple[Driver, float] | None:
         """
-        En yakın müsait sürücüyü bulur ve o sürücüye olan mesafeyi döndürür.
+        Finds the nearest available driver and returns the distance to that driver.
         """
         nearest_driver = None
         min_distance = float('inf')
@@ -62,7 +62,7 @@ class RideService:
         available_drivers = [d for d in self._drivers if d.is_available]
 
         if not available_drivers:
-            raise NoDriverFoundError("Şu anda müsait sürücü yok.")
+            raise NoDriverFoundError("No available drivers currently.")
 
         for driver in available_drivers:
             distance = calculate_distance(driver.current_location, pickup_loc)
@@ -72,67 +72,67 @@ class RideService:
 
         return nearest_driver, min_distance
 
-    # Request Handling (Talep İşleme) [cite: 487]
+    # [cite_start]Request Handling (Requirement: Handle user ride requests) [cite: 487]
     def request_ride(self, passenger: Passenger, pickup_loc: Location, dropoff_loc: Location) -> RideRequest:
-        """Yeni bir sürüş talebi oluşturur ve işler."""
+        """Creates and processes a new ride request."""
         if pickup_loc.latitude == dropoff_loc.latitude and pickup_loc.longitude == dropoff_loc.longitude:
-            raise InvalidRequestError("Alış ve bırakış konumları aynı olamaz.")
+            raise InvalidRequestError("Pickup and dropoff locations cannot be the same.")
             
         request = RideRequest(passenger, pickup_loc, dropoff_loc)
         self._requests.append(request)
         
-        print(f"\n[REQUEST] Yeni talep oluşturuldu: {request.passenger.name}")
+        print(f"\n[REQUEST] New request created for: {request.passenger.name}")
         return request
 
-    # Assignment (Sürüş Atama)
+    # Assignment (Ride Assignment)
     def assign_ride(self, request: RideRequest) -> Ride:
-        """Sürüş talebine uygun sürücü atar ve sürüşü başlatır."""
-        # 1. En yakın müsait sürücüyü bul.
+        """Assigns a suitable driver to the ride request and starts the ride."""
+        # 1. Find the nearest available driver.
         nearest_driver, driver_distance = self._find_nearest_driver(request.pickup_loc)
 
-        # 2. Sürüş mesafesini ve ücreti hesapla.
+        # 2. Calculate ride distance and fare.
         ride_distance = calculate_distance(request.pickup_loc, request.dropoff_loc)
         fare = self._estimate_fare(ride_distance)
 
-        # 3. Sürüşü başlat.
+        # 3. Start the ride.
         new_ride = Ride(request, nearest_driver, fare, ride_distance)
         self._rides.append(new_ride)
 
-        # 4. Sürücü durumunu güncelle.
+        # 4. Update driver status.
         nearest_driver.set_availability(False)
         request.set_status("Assigned")
 
-        print(f"[ASSIGNMENT] Sürücü {nearest_driver.name} atandı. Tahmini Ücret: {fare:.2f} TL, Mesafe: {ride_distance:.2f} km")
+        print(f"[ASSIGNMENT] Driver {nearest_driver.name} assigned. Estimated Fare: {fare:.2f} TL, Distance: {ride_distance:.2f} km")
         return new_ride
 
-    # Ride Completion (Sürüş Tamamlama)
+    # Ride Completion
     def complete_ride(self, ride: Ride, rating: float, actual_distance: float, final_fare: float):
-        """Bir sürüşün tamamlanmasını simüle eder ve tüm verileri günceller."""
+        """Simulates the completion of a ride and updates all data."""
         ride.complete(actual_distance, final_fare, rating)
-        print(f"[COMPLETE] Sürüş tamamlandı. Kazanç: {final_fare:.2f} TL. Yeni Sürücü Puanı: {ride.driver._rating:.2f}")
+        print(f"[COMPLETE] Ride completed. Earnings: {final_fare:.2f} TL. New Driver Rating: {ride.driver._rating:.2f}")
 
-    # --- Raporlama / Sıralama ---
+    # --- Reporting / Sorting ---
 
-    # Sort Completed Rides (Tamamlanmış Sürüşleri Sıralama) [cite: 493]
+    # [cite_start]Sort Completed Rides (Requirement: Sort completed rides) [cite: 493]
     def sort_completed_rides(self, sort_by: str = 'rating', reverse: bool = True):
-        """Tamamlanmış sürüşleri puana veya mesafeye göre sıralar."""
+        """Sorts completed rides by rating or distance."""
         completed_rides = [r for r in self._rides if r._status == "Completed"]
 
         if sort_by == 'rating':
-            # Sürücünün puanına göre sıralama (dolaylı)
+            # Sort by driver rating (indirectly)
             sorted_rides = sorted(completed_rides, key=lambda r: r.driver._rating, reverse=reverse)
         elif sort_by == 'distance':
-            # Tahmini mesafeye göre sıralama
+            # Sort by estimated distance
             sorted_rides = sorted(completed_rides, key=lambda r: r.estimated_distance, reverse=reverse)
         else:
-            print("Geçersiz sıralama kriteri.")
+            print("Invalid sorting criterion.")
             return []
             
         return sorted_rides
 
-    # --- Basit Analitik ---
+    # --- Basic Analytics ---
     def generate_simple_analytics(self):
-        """Basit analitik raporlar oluşturur."""
+        """Generates simple analytical reports."""
         completed_rides = [r for r in self._rides if r._status == "Completed"]
         total_trips = len(completed_rides)
         total_fare = sum(r.fare for r in completed_rides)
@@ -143,12 +143,12 @@ class RideService:
             avg_trip_time = total_time / total_trips
 
         print("\n--- Basic System Analytics ---")
-        print(f"Toplam Tamamlanan Sürüş: {total_trips}")
-        print(f"Toplam Kazanılan Ücret: {total_fare:.2f} TL")
-        print(f"Ortalama Sürüş Süresi: {avg_trip_time}") # 
+        print(f"Total Completed Rides: {total_trips}")
+        print(f"Total Earnings: {total_fare:.2f} TL")
+        print(f"Average Ride Duration: {avg_trip_time}") # 
         
     def save_state(self):
-        """Mevcut sistem durumunu kaydeder."""
+        """Saves the current system state."""
         data = {
             'drivers': [d.to_dict() for d in self._drivers],
             'passengers': [p.to_dict() for p in self._passengers],
@@ -156,4 +156,5 @@ class RideService:
             'rides': [r.to_dict() for r in self._rides],
         }
         save_data(data)
-        print("\n[PERSISTENCE] Tüm veriler başarıyla kaydedildi.")
+
+        print("\n[PERSISTENCE] All data successfully saved.")
