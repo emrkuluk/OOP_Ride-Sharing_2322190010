@@ -8,10 +8,10 @@ from utils import Location
 # 1. Base Class: Person
 # -----------------------------------------------------------
 class Person:
-    """Driver ve Passenger için temel sınıf."""
+    """Base class for Driver and Passenger."""
     def __init__(self, name: str, phone: str, current_location: Location):
         self._id = str(uuid.uuid4())
-        self._name = name # Kapsülleme
+        self._name = name # Encapsulation
         self._phone = phone
         self._current_location = current_location
 
@@ -28,18 +28,18 @@ class Person:
         return self._current_location
 
     def update_location(self, new_location: Location):
-        """Konum güncelleme yöntemi."""
+        """Method to update the current location."""
         self._current_location = new_location
-        print(f"{self.name} konumu güncellendi: {new_location}")
+        print(f"{self.name}'s location updated: {new_location}")
 
 # -----------------------------------------------------------
-# 2. Driver (Sürücü)
+# 2. Driver
 # -----------------------------------------------------------
 class Driver(Person):
-    """Ride-Sharing sistemindeki bir sürücüyü temsil eder."""
+    """Represents a driver in the Ride-Sharing system."""
     def __init__(self, name: str, phone: str, current_location: Location, vehicle):
         super().__init__(name, phone, current_location)
-        self._vehicle = vehicle # Composition: Driver bir Vehicle'a sahiptir. [cite: 485]
+        [cite_start]self._vehicle = vehicle # Composition: A Driver has a Vehicle. [cite: 485]
         self._is_available = True
         self._rating = 5.0
         self._total_rides = 0
@@ -54,14 +54,14 @@ class Driver(Person):
         return self._is_available
 
     def set_availability(self, status: bool):
-        """Sürücü müsaitlik durumunu günceller."""
+        """Updates the driver's availability status."""
         self._is_available = status
 
     def complete_ride(self, fare: float, new_rating: float):
-        """Sürüş tamamlandığında güncellemeleri yapar."""
+        """Updates driver statistics upon ride completion."""
         self._total_rides += 1
         self._earnings += fare
-        # Basit derecelendirme güncellemesi
+        # Simple rating update
         self._rating = (self._rating * (self._total_rides - 1) + new_rating) / self._total_rides
         self.set_availability(True)
 
@@ -79,10 +79,10 @@ class Driver(Person):
         }
 
 # -----------------------------------------------------------
-# 3. Passenger (Yolcu)
+# 3. Passenger
 # -----------------------------------------------------------
 class Passenger(Person):
-    """Ride-Sharing sistemindeki bir yolcuyu temsil eder."""
+    """Represents a passenger in the Ride-Sharing system."""
     def __init__(self, name: str, phone: str, current_location: Location):
         super().__init__(name, phone, current_location)
         self._total_rides = 0
@@ -100,10 +100,10 @@ class Passenger(Person):
         }
 
 # -----------------------------------------------------------
-# 4. Vehicle (Araç)
+# 4. Vehicle
 # -----------------------------------------------------------
 class Vehicle:
-    """Bir sürücüye ait aracı temsil eder."""
+    """Represents a vehicle belonging to a driver."""
     def __init__(self, make: str, model: str, license_plate: str):
         self._make = make
         self._model = model
@@ -122,10 +122,10 @@ class Vehicle:
         }
 
 # -----------------------------------------------------------
-# 5. RideRequest (Sürüş Talebi)
+# 5. RideRequest
 # -----------------------------------------------------------
 class RideRequest:
-    """Yolcu tarafından oluşturulan bir sürüş talebini temsil eder."""
+    """Represents a ride request created by a passenger."""
     def __init__(self, passenger: Passenger, pickup_loc: Location, dropoff_loc: Location):
         self._id = str(uuid.uuid4())
         self._passenger = passenger
@@ -172,10 +172,10 @@ class RideRequest:
         }
         
 # -----------------------------------------------------------
-# 6. Ride (Sürüş)
+# 6. Ride
 # -----------------------------------------------------------
 class Ride:
-    """Onaylanmış bir sürüşü temsil eder."""
+    """Represents a confirmed and ongoing ride."""
     def __init__(self, request: RideRequest, driver: Driver, fare: float, estimated_distance: float):
         self._id = str(uuid.uuid4())
         self._request = request
@@ -199,7 +199,7 @@ class Ride:
         return self._fare
 
     def complete(self, actual_distance: float, final_fare: float, rating: float):
-        """Sürüşü tamamlar ve ilgili nesneleri günceller."""
+        """Finalizes the ride and updates related objects."""
         self._end_time = datetime.now()
         self._status = "Completed"
         self._driver.update_location(self._request.dropoff_loc)
