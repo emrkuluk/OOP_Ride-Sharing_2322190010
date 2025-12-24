@@ -1,78 +1,97 @@
-# service.py (Eklenen Metotlar)
+from models import Driver, Passenger, RideRequest, Ride, Vehicle
+from utils import calculate_distance, save_data, load_data, NoDriverFoundError, InvalidRequestError, Location
+from datetime import timedelta
 
-    # Optimal Assignment Algorithm (Sürücü-Yolcu Eşleştirme) 
-    def _optimized_driver_matching(self, request: RideRequest) -> tuple[Driver, float] | None:
-        """
-        Greedy algoritma kullanarak optimal sürücü-yolcu eşleştirmesini uygular.
-        Hedef: Sürücünün yolcuya ulaşma süresini (dolayısıyla yolcunun bekleme süresini) minimize etmek.
-        """
-        available_drivers = [d for d in self._drivers if d.is_available]
+BASE_RATE = 0.50  
+TIME_RATE = 0.20  
+BASE_FARE = 2.50  
+
+class RideService:
+    def __init__(self):
+        self._drivers = []
+        self._passengers = []
+        self._requests = []
+        self._rides = []
+        self._load_initial_data()
+
+    def _load_initial_data(self):
+        data = load_data()
+        print("Initial Data Loaded.")
         
+    def add_driver(self, driver: Driver):
+        self._drivers.append(driver)
+
+    def add_passenger(self, passenger: Passenger):
+        self._passengers.append(passenger)
+
+    def _estimate_fare(self, distance_km: float) -> float:
+        estimated_time_min = (distance_km / 30) * 60
+        fare = BASE_FARE + (distance_km * BASE_RATE) + (estimated_time_min * TIME_RATE)
+        return round(fare, 2)
+
+    def _optimized_driver_matching(self, request: RideRequest) -> tuple[Driver, float] | None:
+        available_drivers = [d for d in self._drivers if d.is_available]
         if not available_drivers:
-            raise NoDriverFoundError("Şu anda müsait sürücü yok.")
+            raise NoDriverFoundError("No available drivers found.")
 
         best_driver = None
-        min_arrival_time = float('inf') # Sürücünün yolcuya ulaşma süresini minimize et
-
-        # Ortalama hız varsayımı (km/dakika)
+        min_arrival_time = float('inf')
         AVG_SPEED_KM_PER_MIN = 0.5 
 
         for driver in available_drivers:
-            # 1. Sürücünün yolcuya olan mesafesi (driver-to-pickup)
-            driver_to_pickup_dist = calculate_distance(driver.current_location, request.pickup_loc)
-            
-            # 2. Yolcuya tahmini varış süresi (bekleme süresi)
-            estimated_arrival_time_min = driver_to_pickup_dist / AVG_SPEED_KM_PER_MIN
-            
-            # Basit Greedy Kuralı: En kısa varış süresi (min bekleme süresi) 
-            if estimated_arrival_time_min < min_arrival_time:
-                min_arrival_time = estimated_arrival_time_min
+            dist = calculate_distance(driver.current_location, request.pickup_loc)
+            arrival_time = dist / AVG_SPEED_KM_PER_MIN
+            if arrival_time < min_arrival_time:
+                min_arrival_time = arrival_time
                 best_driver = driver
                 
-        # Atanan sürücü ve sürücü-yolcu mesafesi
-        driver_to_pickup_dist = calculate_distance(best_driver.current_location, request.pickup_loc)
-        return best_driver, driver_to_pickup_dist
+        return best_driver, calculate_distance(best_driver.current_location, request.pickup_loc)
 
-    # assign_ride metodunu bu yeni optimizasyon algoritmasını kullanacak şekilde güncelleyin:
+    def request_ride(self, passenger: Passenger, pickup_loc: Location, dropoff_loc: Location) -> RideRequest:
+        if pickup_loc.latitude == dropoff_loc.latitude and pickup_loc.longitude == dropoff_loc.longitude:
+            raise InvalidRequestError("Pickup and dropoff locations cannot be identical.")
+        request = RideRequest(passenger, pickup_loc, dropoff_loc)
+        self._requests.append(request)
+        return request
+
     def assign_ride(self, request: RideRequest) -> Ride:
-        """Sürüş talebine uygun optimal sürücü atar ve sürüşü başlatır."""
-        try:
-            # Stage 3: Optimize edilmiş eşleştirmeyi kullan 
-            nearest_driver, driver_distance = self._optimized_driver_matching(request)
-        except NoDriverFoundError as e:
-            print(f"Hata: {e}")
-            raise e
-
-        # 2. Sürüş mesafesini ve ücreti hesapla.
-        ride_distance = calculate_distance(request.pickup_loc, request.dropoff_loc)
-        fare = self._estimate_fare(ride_distance)
-
-        # 3. Sürüşü başlat.
-        new_ride = Ride(request, nearest_driver, fare, ride_distance)
+        matched_driver, dist = self._optimized_driver_matching(request)
+        ride_dist = calculate_distance(request.pickup_loc, request.dropoff_loc)
+        fare = self._estimate_fare(ride_dist)
+        new_ride = Ride(request, matched_driver, fare, ride_dist)
         self._rides.append(new_ride)
-
-        # 4. Sürücü durumunu güncelle.
-        nearest_driver.set_availability(False)
+        matched_driver.set_availability(False)
         request.set_status("Assigned")
-
-        print(f"[ASSIGNMENT] Optimal Sürücü {nearest_driver.name} atandı. Bekleme süresi ~{driver_distance/0.5:.1f} dakika.")
         return new_ride
 
-    # Advanced Analytics (Gelişmiş Analitik) 
+    def complete_ride(self, ride: Ride, rating: float, actual_distance: float, final_fare: float):
+        ride.complete(actual_distance, final_fare, rating)
+
+    def sort_completed_rides(self, sort_by='rating'):
+        completed = [r for r in self._rides if r._status == "Completed"]
+        if sort_by == 'rating':
+            return sorted(completed, key=lambda r: r.driver._rating, reverse=True)
+        return sorted(completed, key=lambda r: r.estimated_distance, reverse=True)
+
     def generate_advanced_analytics(self):
-        """Ortalama gezi süresi ve memnuniyet endeksi gibi gelişmiş raporlar oluşturur."""
-        completed_rides = [r for r in self._rides if r._status == "Completed"]
-        total_trips = len(completed_rides)
+        completed = [r for r in self._rides if r._status == "Completed"]
+        total_trips = len(completed)
+        avg_rating = sum(d._rating for d in self._drivers) / len(self._drivers) if self._drivers else 0
         
-        avg_rating = sum(r.driver._rating for r in self._drivers) / len(self._drivers) if self._drivers else 0
-        
-        # Ortalama Seyahat Süresi
-        avg_trip_time = timedelta()
+        avg_time = timedelta()
         if total_trips > 0:
-            total_time = sum((r._end_time - r._start_time for r in completed_rides), timedelta())
-            avg_trip_time = total_time / total_trips
+            total_time = sum((r._end_time - r._start_time for r in completed), timedelta())
+            avg_time = total_time / total_trips
 
         print("\n--- Advanced Analytics ---")
-        print(f"Toplam Tamamlanan Sürüş: {total_trips}")
-        print(f"Sürücü Memnuniyet Endeksi (Ort. Puan): {avg_rating:.2f} / 5.0")
-        print(f"Ortalama Trip Süresi: {str(avg_trip_time).split('.')[0]}")
+        print(f"Total Completed Trips: {total_trips}")
+        print(f"Satisfaction Index (Avg Rating): {avg_rating:.2f}")
+        print(f"Average Trip Duration: {str(avg_time).split('.')[0]}")
+        
+    def save_state(self):
+        data = {
+            'drivers': [d.to_dict() for d in self._drivers],
+            'passengers': [p.to_dict() for p in self._passengers],
+            'rides': [r.to_dict() for r in self._rides]
+        }
+        save_data(data)
