@@ -39,7 +39,7 @@ class Driver(Person):
     """Represents a driver in the Ride-Sharing system."""
     def __init__(self, name: str, phone: str, current_location: Location, vehicle):
         super().__init__(name, phone, current_location)
-        [cite_start]self._vehicle = vehicle # Composition: A Driver has a Vehicle. [cite: 485]
+       self._vehicle = vehicle # Composition: A Driver has a Vehicle.
         self._is_available = True
         self._rating = 5.0
         self._total_rides = 0
@@ -218,3 +218,4 @@ class Ride:
             'fare': self._fare,
             'status': self._status
         }
+
