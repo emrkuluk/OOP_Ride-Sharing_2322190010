@@ -39,7 +39,7 @@ def run_simulation(service: RideService):
     except (NoDriverFoundError, InvalidRequestError) as e:
         print(f"Ride Execution Error: {e}")
 
-    service.generate_advanced_analytics()
+    service.generate_simple_analytics()
 
     sorted_rides = service.sort_completed_rides(sort_by='rating')
     print("\n--- Completed Rides Sorted by Rating ---")
@@ -52,3 +52,4 @@ if __name__ == "__main__":
     ride_sharing_app = RideService()
     setup_simulation(ride_sharing_app)
     run_simulation(ride_sharing_app)
+
